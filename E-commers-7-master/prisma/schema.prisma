@@ -1,0 +1,278 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  email        String?  @unique
+  phone        String   @unique
+  passwordHash String
+  role         String   @default("CUSTOMER")
+  status       String   @default("ACTIVE")
+  avatar       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  adminPermissions AdminPermission?
+  products         Product[]
+  orders           Order[]
+  reviews          Review[]
+  cart             Cart?
+  wishlist         Wishlist?
+}
+
+model AdminPermission {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @unique @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  permissions String
+  createdBy   String?
+  updatedAt   DateTime @updatedAt
+}
+
+model Category {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  parentId    String?    @db.ObjectId
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children    Category[] @relation("CategoryTree")
+  name        String
+  slug        String     @unique
+  image       String?
+  banner      String?
+  description String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  products    Product[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Brand {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String    @unique
+  logo        String?
+  description String?
+  isActive    Boolean   @default(true)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  sellerId         String?  @db.ObjectId
+  seller           User?    @relation(fields: [sellerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  categoryId       String   @db.ObjectId
+  category         Category @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  brandId          String?  @db.ObjectId
+  brand            Brand?   @relation(fields: [brandId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  name             String
+  slug             String   @unique
+  sku              String   @unique
+  price            Float
+  salePrice        Float?
+  stock            Int      @default(0)
+  minOrderQty      Int      @default(1)
+  shortDescription String?
+  description      String?
+  specifications   String?
+  weight           Float?
+  images           String   @default("[]")
+  isFeatured       Boolean  @default(false)
+  isPublished      Boolean  @default(true)
+  seoTitle         String?
+  seoDescription   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  cartItems     CartItem[]
+  wishlistItems WishlistItem[]
+  orderItems    OrderItem[]
+  reviews       Review[]
+}
+
+model Cart {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String?    @unique @db.ObjectId
+  user      User?      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sessionId String?    @unique
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  cartId    String   @db.ObjectId
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  productId String   @db.ObjectId
+  product   Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+}
+
+model Wishlist {
+  id        String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String         @unique @db.ObjectId
+  user      User           @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  items     WishlistItem[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model WishlistItem {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  wishlistId String   @db.ObjectId
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  productId  String   @db.ObjectId
+  product    Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt  DateTime @default(now())
+
+  @@unique([wishlistId, productId])
+}
+
+model Order {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderNumber     String   @unique
+  userId          String?  @db.ObjectId
+  user            User?    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  status          String   @default("PLACED")
+  paymentStatus   String   @default("PENDING")
+  paymentMethod   String   @default("COD")
+  subtotal        Float
+  discount        Float    @default(0)
+  shippingFee     Float    @default(0)
+  tax             Float    @default(0)
+  total           Float
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  shippingAddress String
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+  payment       Payment?
+}
+
+model OrderItem {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  orderId   String  @db.ObjectId
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  productId String  @db.ObjectId
+  product   Product @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  name      String
+  sku       String
+  price     Float
+  quantity  Int
+  total     Float
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId   String   @db.ObjectId
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  status    String
+  note      String?
+  createdBy String?
+  createdAt DateTime @default(now())
+}
+
+model Payment {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId       String   @unique @db.ObjectId
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  method        String
+  amount        Float
+  status        String   @default("PENDING")
+  transactionId String?
+  gatewayData   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Coupon {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  code        String    @unique
+  type        String
+  value       Float
+  minOrder    Float     @default(0)
+  maxDiscount Float?
+  usageLimit  Int?
+  usedCount   Int       @default(0)
+  isActive    Boolean   @default(true)
+  startsAt    DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Review {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId  String   @db.ObjectId
+  product    Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  userId     String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rating     Int
+  comment    String?
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Setting {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  group String
+  key   String
+  value String
+
+  @@unique([group, key])
+}
+
+model Banner {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  title     String?
+  image     String
+  link      String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model ContactMessage {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  email     String
+  phone     String?
+  subject   String?
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model LandingPage {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  title          String
+  slug           String    @unique
+  status         String    @default("draft")
+  featuredImage  String?
+  seoTitle       String?
+  seoDescription String?
+  sections       String    @default("[]")
+  isHomepage     Boolean   @default(false)
+  publishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
